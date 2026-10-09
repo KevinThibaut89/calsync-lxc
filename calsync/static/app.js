@@ -2,6 +2,10 @@
 
 const $ = (id) => document.getElementById(id);
 
+// Whether the Google client is already embedded server-side. When it is, the
+// Connect button goes straight to Google; otherwise it asks for the JSON file.
+let googleConfigured = false;
+
 async function refreshStatus() {
   let s;
   try {
@@ -11,6 +15,11 @@ async function refreshStatus() {
   }
   setBadge($("ms-badge"), s.microsoft);
   setBadge($("google-badge"), s.google);
+  googleConfigured = !!s.google_configured;
+  if (googleConfigured && $("google-hint")) {
+    $("google-hint").textContent =
+      "A Google client is already configured on this container — just click Connect.";
+  }
   if (s.microsoft && s.google) {
     $("done").classList.remove("hidden");
   }
@@ -63,7 +72,14 @@ async function pollMs() {
 // Google: a single button that reads the downloaded client JSON and submits it,
 // so there's nothing to type. The browser parses the file and POSTs the two
 // fields to /google/save, which 302-redirects on to Google's consent screen.
-$("google-connect").addEventListener("click", () => $("google-file").click());
+$("google-connect").addEventListener("click", () => {
+  if (googleConfigured) {
+    // Credentials already embedded — go straight to Google's consent screen.
+    location.href = "/google/start";
+  } else {
+    $("google-file").click();
+  }
+});
 
 $("google-file").addEventListener("change", async (e) => {
   const file = e.target.files[0];
