@@ -19,9 +19,24 @@ die()  { echo -e "  \033[1;31m✘\033[0m $*" >&2; exit 1; }
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 
 info "Downloading $REPO@$REF…"
-curl -fsSL "https://codeload.github.com/$REPO/tar.gz/refs/heads/$REF" -o "$WORK/s.tgz" \
-  || curl -fsSL "https://codeload.github.com/$REPO/tar.gz/refs/tags/$REF" -o "$WORK/s.tgz" \
-  || die "Download failed."
+# Download with Python (always present); the container has no curl.
+python3 - "$REPO" "$REF" "$WORK/s.tgz" <<'PY' || die "Download failed."
+import sys, urllib.request
+repo, ref, out = sys.argv[1], sys.argv[2], sys.argv[3]
+urls = [
+    f"https://codeload.github.com/{repo}/tar.gz/refs/heads/{ref}",
+    f"https://codeload.github.com/{repo}/tar.gz/refs/tags/{ref}",
+]
+last = None
+for u in urls:
+    try:
+        urllib.request.urlretrieve(u, out)
+        sys.exit(0)
+    except Exception as e:  # noqa: BLE001
+        last = e
+print(last, file=sys.stderr)
+sys.exit(1)
+PY
 tar -xzf "$WORK/s.tgz" -C "$WORK"
 SRC="$(find "$WORK" -maxdepth 1 -type d -name 'calsync-*' | head -1)"
 [ -n "$SRC" ] || die "Bad archive."
