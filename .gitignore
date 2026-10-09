@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+build/
+dist/
+# Local state / secrets — never commit.
+tokens.json
+last-run.json
+*.pem
+state/

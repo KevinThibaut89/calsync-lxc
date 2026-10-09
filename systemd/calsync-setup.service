@@ -1,0 +1,18 @@
+[Unit]
+Description=CalSync one-time setup web UI
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=calsync
+Group=calsync
+Environment=CALSYNC_STATE_DIR=/var/lib/calsync
+ExecStart=/usr/bin/python3 -m calsync setup-server --host 0.0.0.0 --port 8777 \
+  --cert /var/lib/calsync/setup-cert.pem --key /var/lib/calsync/setup-key.pem
+WorkingDirectory=/opt/calsync
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/calsync

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CalSync setup</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<main>
+  <h1>CalSync setup</h1>
+  <p class="sub">Connect both calendars once. After that the container syncs on its own.</p>
+
+  <section class="card" id="ms-card">
+    <div class="row">
+      <h2>1 · Microsoft 365 (source)</h2>
+      <span class="badge" id="ms-badge">…</span>
+    </div>
+    <p>Sign in to the work account CalSync reads from. It connects as a calendar
+       client — no app registration needed.</p>
+    <button id="ms-connect">Connect Microsoft</button>
+    <div id="ms-flow" class="flow hidden">
+      <p>Open <a id="ms-link" target="_blank" rel="noopener">this Microsoft page</a>
+         and enter the code:</p>
+      <p class="code" id="ms-code"></p>
+      <p class="muted" id="ms-wait">Waiting for you to finish signing in…</p>
+    </div>
+  </section>
+
+  <section class="card" id="google-card">
+    <div class="row">
+      <h2>2 · Google (destination)</h2>
+      <span class="badge" id="google-badge">…</span>
+    </div>
+    <p>CalSync writes into a dedicated calendar on your Google account. You need
+       an OAuth client from a free Google Cloud project (type <b>Web application</b>).</p>
+    <p class="muted">Add this exact redirect URI to that OAuth client first:</p>
+    <p class="code small">{{REDIRECT_URI}}</p>
+    <form method="post" action="/google/save">
+      <label>Client ID<input name="client_id" autocomplete="off" required></label>
+      <label>Client secret<input name="client_secret" type="password" autocomplete="off" required></label>
+      <button type="submit">Connect Google</button>
+    </form>
+  </section>
+
+  <p class="done hidden" id="done">✓ Both calendars connected. You can close this page —
+     the first sync runs within a few minutes.</p>
+</main>
+<script src="/static/app.js"></script>
+</body>
+</html>

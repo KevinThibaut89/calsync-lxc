@@ -1,0 +1,64 @@
+:root {
+  color-scheme: light dark;
+  --bg: #f6f7f9;
+  --card: #ffffff;
+  --ink: #1b1f23;
+  --muted: #6b7280;
+  --line: #e3e6ea;
+  --accent: #2563eb;
+  --ok: #15803d;
+  --okbg: #dcfce7;
+  --pend: #92400e;
+  --pendbg: #fef3c7;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1216; --card: #171b21; --ink: #e8eaed; --muted: #9aa3ad;
+    --line: #262b33; --accent: #4b8bff; --okbg: #0f3d24; --pendbg: #3d2f0f;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+main { max-width: 620px; margin: 0 auto; padding: 32px 20px 64px; }
+h1 { font-size: 24px; margin: 0 0 4px; }
+h2 { font-size: 17px; margin: 0; }
+.sub { color: var(--muted); margin: 0 0 24px; }
+.card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  padding: 20px; margin-bottom: 18px;
+}
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.card p { color: var(--ink); }
+.muted { color: var(--muted); font-size: 13px; }
+.badge {
+  font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px;
+  background: var(--pendbg); color: var(--pend); white-space: nowrap;
+}
+.badge.ok { background: var(--okbg); color: var(--ok); }
+button {
+  background: var(--accent); color: #fff; border: 0; border-radius: 8px;
+  padding: 9px 16px; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+button:hover { filter: brightness(1.05); }
+label { display: block; margin: 10px 0; font-size: 13px; color: var(--muted); }
+input {
+  display: block; width: 100%; margin-top: 4px; padding: 9px 10px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--bg);
+  color: var(--ink); font-size: 14px;
+}
+.code {
+  font: 18px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 2px; background: var(--bg); border: 1px solid var(--line);
+  border-radius: 8px; padding: 10px 14px; display: inline-block;
+}
+.code.small { font-size: 13px; letter-spacing: 0; word-break: break-all; display: block; }
+.flow { margin-top: 14px; }
+.hidden { display: none; }
+.done {
+  background: var(--okbg); color: var(--ok); padding: 14px 16px;
+  border-radius: 10px; font-weight: 600;
+}
+a { color: var(--accent); }

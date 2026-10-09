@@ -1,0 +1,25 @@
+# CalSync configuration (non-secret).
+# Copied to /var/lib/calsync/config.toml by the installer. Tokens and the Google
+# client secret live separately in /var/lib/calsync/tokens.json (never here).
+
+[sync]
+# How far back and ahead to mirror, in days.
+past_days = 7
+future_days = 60
+# How often the systemd timer runs a sync.
+interval_minutes = 10
+# Prefix added to copied event titles (e.g. "[Work] "). Empty = no prefix.
+title_prefix = ""
+
+[google]
+# Name of the Google calendar copied events go into. Created if missing.
+calendar_name = "Work (Outlook)"
+
+[microsoft]
+# "organizations" works for any Microsoft 365 work/school account. Use your
+# tenant id or domain to lock it to one tenant.
+tenant = "organizations"
+# The public "Microsoft Office" client (no app registration needed). If your
+# tenant blocks it with Conditional Access, set this to your own registered
+# public client id, or to the Azure CLI id 04b07795-8ddb-461a-bbee-02f9e1bf7b46.
+client_id = "d3590ed6-52b3-4102-aeff-aad2292ab01c"

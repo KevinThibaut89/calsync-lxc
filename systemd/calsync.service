@@ -1,0 +1,21 @@
+[Unit]
+Description=CalSync — one sync pass (Outlook/M365 -> Google)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=calsync
+Group=calsync
+Environment=CALSYNC_STATE_DIR=/var/lib/calsync
+ExecStart=/usr/bin/python3 -m calsync sync
+WorkingDirectory=/opt/calsync
+# Hardening: the service only needs its own state dir and outbound network.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/calsync
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6

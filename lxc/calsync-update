@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+#
+# Update CalSync in place, with automatic rollback.
+# Installed as /usr/local/bin/update inside the container. Run:  update
+#
+set -euo pipefail
+
+REPO="${CALSYNC_REPO:-KevinThibaut89/calsync-lxc}"
+REF="${CALSYNC_REF:-main}"
+APP=/opt/calsync
+BAK=/opt/calsync.prev
+
+msg()  { echo -e "  \033[1;32m✔\033[0m $*"; }
+info() { echo -e "  \033[1;34m•\033[0m $*"; }
+die()  { echo -e "  \033[1;31m✘\033[0m $*" >&2; exit 1; }
+
+[ "$(id -u)" -eq 0 ] || die "Run as root (inside the container)."
+
+WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
+
+info "Downloading $REPO@$REF…"
+curl -fsSL "https://codeload.github.com/$REPO/tar.gz/refs/heads/$REF" -o "$WORK/s.tgz" \
+  || curl -fsSL "https://codeload.github.com/$REPO/tar.gz/refs/tags/$REF" -o "$WORK/s.tgz" \
+  || die "Download failed."
+tar -xzf "$WORK/s.tgz" -C "$WORK"
+SRC="$(find "$WORK" -maxdepth 1 -type d -name 'calsync-*' | head -1)"
+[ -n "$SRC" ] || die "Bad archive."
+
+info "Backing up current version…"
+rm -rf "$BAK"; cp -a "$APP" "$BAK"
+
+info "Installing new version…"
+rm -rf "$APP/calsync" "$APP/systemd" "$APP/lxc"
+cp -a "$SRC/calsync" "$SRC/systemd" "$SRC/lxc" "$APP/"
+cp -a "$SRC/config.example.toml" "$APP/" 2>/dev/null || true
+cp "$APP/systemd/"*.service "$APP/systemd/"*.timer /etc/systemd/system/ 2>/dev/null || true
+install -m 0755 "$APP/lxc/calsync-update" /usr/local/bin/update 2>/dev/null || true
+chown -R calsync:calsync "$APP"
+systemctl daemon-reload
+
+# Health check: the app must at least import and report its version.
+if cd "$APP" && python3 -m calsync version >/dev/null 2>&1; then
+  systemctl restart calsync.timer
+  msg "Updated to $(cd "$APP" && python3 -m calsync version)."
+  rm -rf "$BAK"
+else
+  info "New version failed to start — rolling back."
+  rm -rf "$APP"; mv "$BAK" "$APP"
+  cp "$APP/systemd/"*.service "$APP/systemd/"*.timer /etc/systemd/system/ 2>/dev/null || true
+  chown -R calsync:calsync "$APP"
+  systemctl daemon-reload
+  systemctl restart calsync.timer || true
+  die "Rolled back to the previous version."
+fi
