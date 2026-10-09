@@ -208,12 +208,20 @@ for _ in $(seq 1 15); do
   sleep 1
 done
 
+# Google rejects raw IPs as OAuth redirect URIs (it requires a real public
+# TLD), so we address the container through a wildcard-DNS hostname that maps
+# straight back to its IP. nip.io needs no setup and resolves <ip>.nip.io -> <ip>.
+HOSTADDR="${IP:-<container-ip>}"
+NIPHOST="${IP:+${IP}.nip.io}"
+NIPHOST="${NIPHOST:-<container-ip>.nip.io}"
+
 echo
 msg "CalSync is installed in CT $CTID."
 echo
-echo "  Finish setup in your browser (same network as Proxmox):"
+echo "  Finish setup in your browser (same network as Proxmox). Use the"
+echo "  nip.io address below — Google will not accept a bare IP later:"
 echo
-echo -e "     \033[1mhttps://${IP:-<container-ip>}:$SETUP_PORT/\033[0m"
+echo -e "     \033[1mhttps://$NIPHOST:$SETUP_PORT/\033[0m"
 echo
 echo "  (Your browser will warn about the self-signed certificate — continue past it.)"
 echo
@@ -224,10 +232,15 @@ echo
 echo "  Google client, once (free): https://console.cloud.google.com/"
 echo "    • New project → enable 'Google Calendar API'."
 echo "    • Credentials → Create OAuth client ID → type 'Web application'."
-echo "    • Add this Authorized redirect URI:"
-echo -e "        \033[1mhttps://${IP:-<container-ip>}:$SETUP_PORT/oauth/google/callback\033[0m"
+echo "    • Leave 'Authorised JavaScript origins' empty; add this redirect URI:"
+echo -e "        \033[1mhttps://$NIPHOST:$SETUP_PORT/oauth/google/callback\033[0m"
 echo "    • OAuth consent screen → publish to 'In production'"
 echo "      (otherwise Google expires the login after ~7 days)."
 echo
+if [ -n "$IP" ] && ! getent hosts "$NIPHOST" >/dev/null 2>&1; then
+  warn "Note: $NIPHOST did not resolve from this node. If your browser can't"
+  warn "reach it either (some routers block private IPs in public DNS), try"
+  warn "$IP.sslip.io instead, or use an SSH tunnel to localhost:$SETUP_PORT."
+fi
 echo "  After both are connected the first sync runs within a couple of minutes."
 echo "  Check it with:  pct exec $CTID -- calsync status"

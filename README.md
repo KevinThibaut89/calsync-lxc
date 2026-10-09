@@ -38,15 +38,25 @@ ID. **Advanced** lets you pick the ID, resources, storage, bridge and interval.
 
 ### Finish setup in your browser
 
-When the installer finishes it prints a URL like `https://<ct-ip>:8777/`. Open
-it from any browser on the same network (your browser warns once about the
-self-signed certificate — continue past it). On that page:
+When the installer finishes it prints a URL like
+`https://<ct-ip>.nip.io:8777/`. Open it from any browser on the same network
+(your browser warns once about the self-signed certificate — continue past it).
+On that page:
 
 1. **Connect Microsoft 365** — click the button, open the Microsoft link it
    shows and enter the code. That's the whole Microsoft side.
 2. **Connect Google** — paste a Google OAuth client ID + secret, then sign in.
 
 Once both show *Connected*, the first sync runs within a couple of minutes.
+
+> **Why the `.nip.io` hostname?** Google refuses a bare IP address as an OAuth
+> redirect URI — it insists on a real public TLD. `nip.io` is wildcard DNS that
+> maps `<ip>.nip.io` straight back to `<ip>`, so the container can be its own
+> redirect target with no domain to buy. If your router blocks private IPs in
+> public DNS answers (DNS-rebinding protection) and the name won't resolve, try
+> `<ip>.sslip.io`, or reach the container through an SSH tunnel to
+> `localhost:8777` (Google does allow `localhost`). **Open the setup page via
+> the same hostname you register below**, so the redirect matches.
 
 ### Google OAuth client (one-time, free)
 
@@ -55,8 +65,9 @@ account. At <https://console.cloud.google.com/>:
 
 1. Create a project, then **enable the "Google Calendar API"**.
 2. **Credentials → Create OAuth client ID → type "Web application"**.
-3. Add the **Authorized redirect URI** the installer printed:
-   `https://<ct-ip>:8777/oauth/google/callback`
+3. Leave **Authorised JavaScript origins** empty. Add the **Authorized redirect
+   URI** the installer printed (note the `.nip.io`):
+   `https://<ct-ip>.nip.io:8777/oauth/google/callback`
 4. **OAuth consent screen → publish to "In production".** If you leave it in
    *Testing*, Google expires the login after ~7 days and sync stops. In
    production you (the only user) will see an "unverified app" screen once and
