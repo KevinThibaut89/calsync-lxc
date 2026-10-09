@@ -23,10 +23,14 @@ SOURCE_KEY = "calsyncSource"
 HASH_KEY = "calsyncHash"
 
 
-def is_syncable(graph_event: dict[str, Any]) -> bool:
-    """Skip events that should not be copied (cancelled occurrences)."""
+def is_syncable(graph_event: dict[str, Any], *, skip_declined: bool = False) -> bool:
+    """Skip events that should not be copied (cancelled, optionally declined)."""
     if graph_event.get("isCancelled"):
         return False
+    if skip_declined:
+        response = ((graph_event.get("responseStatus") or {}).get("response") or "").lower()
+        if response == "declined":
+            return False
     return True
 
 
@@ -63,20 +67,30 @@ def _google_date(dt: datetime) -> dict[str, str]:
 _FREE = {"free", "tentative", "workingElsewhere"}
 
 
-def to_google_event(graph_event: dict[str, Any], *, title_prefix: str = "") -> dict[str, Any]:
-    """Build the Google event body for a Graph event (full details)."""
+def to_google_event(
+    graph_event: dict[str, Any], *, title_prefix: str = "", detail: str = "full"
+) -> dict[str, Any]:
+    """Build the Google event body for a Graph event.
+
+    ``detail`` controls how much is copied: ``"busy"`` shows only a "Busy"
+    block, ``"title"`` adds the title and location, ``"full"`` also the notes.
+    """
     start_raw = graph_event["start"]
     end_raw = graph_event["end"]
     start_dt = _parse_graph_dt(start_raw)
     end_dt = _parse_graph_dt(end_raw)
     all_day = bool(graph_event.get("isAllDay"))
 
-    summary = graph_event.get("subject") or "(no subject)"
-    if title_prefix:
-        summary = f"{title_prefix}{summary}"
-
-    description = _description(graph_event)
-    location = (graph_event.get("location") or {}).get("displayName") or None
+    if detail == "busy":
+        summary = "Busy"
+        description = None
+        location = None
+    else:
+        summary = graph_event.get("subject") or "(no subject)"
+        if title_prefix:
+            summary = f"{title_prefix}{summary}"
+        location = (graph_event.get("location") or {}).get("displayName") or None
+        description = _description(graph_event) if detail == "full" else None
 
     body: dict[str, Any] = {
         "summary": summary,

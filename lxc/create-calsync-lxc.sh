@@ -65,7 +65,9 @@ if [ "${1:-}" = "--update" ]; then
   pct exec "$CTID" -- bash -c '
     set -e
     tar -C /opt/calsync -xzf /tmp/app.tgz && rm -f /tmp/app.tgz
-    systemctl restart calsync.timer
+    cp /opt/calsync/systemd/*.service /etc/systemd/system/
+    systemctl daemon-reload
+    systemctl restart calsync.service calsync-setup.service
   '
   msg "CT $CTID updated."
   exit 0
@@ -177,11 +179,13 @@ pct exec "$CTID" -- bash -c "
   chown -R calsync:calsync /opt/calsync /var/lib/calsync
   chmod 700 /var/lib/calsync
 
-  # systemd units.
+  # Write the chosen interval into the config so the sync loop uses it.
+  sed -i \"s/^interval_minutes = .*/interval_minutes = $INTERVAL/\" /var/lib/calsync/config.toml 2>/dev/null || true
+
+  # systemd units. The sync runs as a long-lived loop service (not a timer),
+  # so the setup UI can change the interval and auto-sync without root.
   cp /opt/calsync/systemd/calsync.service /etc/systemd/system/
-  cp /opt/calsync/systemd/calsync.timer /etc/systemd/system/
   cp /opt/calsync/systemd/calsync-setup.service /etc/systemd/system/
-  sed -i 's/^OnUnitActiveSec=.*/OnUnitActiveSec=${INTERVAL}min/' /etc/systemd/system/calsync.timer
 
   # 'calsync' command on PATH (no pip install; just a wrapper).
   cat > /usr/local/bin/calsync <<'WRAP'
@@ -194,7 +198,7 @@ WRAP
   install -m 0755 /opt/calsync/lxc/calsync-update /usr/local/bin/update 2>/dev/null || true
 
   systemctl daemon-reload
-  systemctl enable --now calsync.timer >/dev/null 2>&1
+  systemctl enable --now calsync.service >/dev/null 2>&1
   systemctl enable --now calsync-setup.service >/dev/null 2>&1
 "
 

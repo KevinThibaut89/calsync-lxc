@@ -48,22 +48,26 @@ info "Installing new version…"
 rm -rf "$APP/calsync" "$APP/systemd" "$APP/lxc"
 cp -a "$SRC/calsync" "$SRC/systemd" "$SRC/lxc" "$APP/"
 cp -a "$SRC/config.example.toml" "$APP/" 2>/dev/null || true
-cp "$APP/systemd/"*.service "$APP/systemd/"*.timer /etc/systemd/system/ 2>/dev/null || true
+cp "$APP/systemd/"*.service /etc/systemd/system/ 2>/dev/null || true
 install -m 0755 "$APP/lxc/calsync-update" /usr/local/bin/update 2>/dev/null || true
 chown -R calsync:calsync "$APP"
+# Migrate off the old oneshot timer, if present, to the loop service.
+systemctl disable --now calsync.timer >/dev/null 2>&1 || true
+rm -f /etc/systemd/system/calsync.timer
 systemctl daemon-reload
 
 # Health check: the app must at least import and report its version.
 if cd "$APP" && python3 -m calsync version >/dev/null 2>&1; then
-  systemctl restart calsync.timer
+  systemctl enable --now calsync.service >/dev/null 2>&1 || true
+  systemctl restart calsync.service calsync-setup.service
   msg "Updated to $(cd "$APP" && python3 -m calsync version)."
   rm -rf "$BAK"
 else
   info "New version failed to start — rolling back."
   rm -rf "$APP"; mv "$BAK" "$APP"
-  cp "$APP/systemd/"*.service "$APP/systemd/"*.timer /etc/systemd/system/ 2>/dev/null || true
+  cp "$APP/systemd/"*.service /etc/systemd/system/ 2>/dev/null || true
   chown -R calsync:calsync "$APP"
   systemctl daemon-reload
-  systemctl restart calsync.timer || true
+  systemctl restart calsync.service calsync-setup.service || true
   die "Rolled back to the previous version."
 fi

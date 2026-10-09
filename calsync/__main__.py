@@ -13,6 +13,7 @@ import argparse
 import json
 import sys
 import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -21,6 +22,25 @@ from . import config as cfgmod
 from . import google, msgraph
 from .config import Config, TokenStore
 from .sync import run_sync
+
+
+@contextmanager
+def _sync_lock(cfg: Config):
+    """Serialize syncs so the background loop and a manual 'Sync now' from the
+    setup UI never run at the same time."""
+    import fcntl
+
+    cfg.state_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = cfg.state_dir / "sync.lock"
+    fh = open(lock_path, "w")
+    try:
+        fcntl.flock(fh, fcntl.LOCK_EX)
+        yield
+    finally:
+        try:
+            fcntl.flock(fh, fcntl.LOCK_UN)
+        finally:
+            fh.close()
 
 
 def _load(args) -> tuple[Config, TokenStore]:
@@ -79,14 +99,22 @@ def _run_once(cfg: Config, tokens: TokenStore) -> int:
 
     graph = _graph_client(cfg, tokens)
     gclient = _google_client(tokens)
-    result = run_sync(
-        graph,
-        gclient,
-        tokens.google_calendar_id,
-        past_days=cfg.window_past_days,
-        future_days=cfg.window_future_days,
-        title_prefix=cfg.title_prefix,
-    )
+    try:
+        with _sync_lock(cfg):
+            result = run_sync(
+                graph,
+                gclient,
+                tokens.google_calendar_id,
+                past_days=cfg.window_past_days,
+                future_days=cfg.window_future_days,
+                title_prefix=cfg.title_prefix,
+                detail=cfg.detail,
+                skip_declined=cfg.skip_declined,
+            )
+    except Exception as exc:  # noqa: BLE001 - record and report, don't crash silently
+        print(f"[{_now()}] sync failed: {exc}", file=sys.stderr)
+        _append_log(cfg, f"sync failed: {exc}")
+        return 1
     # Microsoft rotates refresh tokens; persist the latest.
     if graph.refresh_token_value and graph.refresh_token_value != tokens.ms_refresh_token:
         tokens.ms_refresh_token = graph.refresh_token_value
@@ -94,8 +122,10 @@ def _run_once(cfg: Config, tokens: TokenStore) -> int:
 
     _write_last_run(cfg, result)
     print(f"[{_now()}] sync: {result.summary()}")
+    _append_log(cfg, f"sync: {result.summary()}")
     for err in result.errors[:10]:
         print(f"  ! {err}", file=sys.stderr)
+        _append_log(cfg, f"  error: {err}")
     return 1 if result.errors else 0
 
 
@@ -103,14 +133,33 @@ def cmd_sync(args) -> int:
     cfg, tokens = _load(args)
     if not args.loop:
         return _run_once(cfg, tokens)
-    interval = max(cfg.poll_interval_minutes, 1) * 60
-    print(f"Running every {cfg.poll_interval_minutes} min. Ctrl-C to stop.")
+
+    # Long-running syncer. It re-reads config each tick so changes made in the
+    # setup UI (interval, auto-sync, window, detail) take effect without a
+    # restart, and it runs immediately when the UI drops a "sync-now" trigger.
+    print("CalSync loop started. Ctrl-C to stop.")
+    tick = 15
+    last_sync = 0.0
+    trigger = cfg.state_dir / "sync-now"
     while True:
-        try:
-            _run_once(cfg, tokens)
-        except Exception as exc:  # noqa: BLE001 - keep the loop alive
-            print(f"[{_now()}] sync failed: {exc}", file=sys.stderr)
-        time.sleep(interval)
+        cfg = Config.load(cfg.state_dir)
+        tokens = TokenStore.load(cfg.token_path)
+        now = time.monotonic()
+        asked = trigger.exists()
+        due = cfg.auto_sync and (now - last_sync) >= cfg.poll_interval_minutes * 60
+        if asked or due:
+            if asked:
+                try:
+                    trigger.unlink()
+                except OSError:
+                    pass
+            try:
+                _run_once(cfg, tokens)
+            except Exception as exc:  # noqa: BLE001 - keep the loop alive
+                print(f"[{_now()}] sync failed: {exc}", file=sys.stderr)
+                _append_log(cfg, f"sync failed: {exc}")
+            last_sync = time.monotonic()
+        time.sleep(tick)
 
 
 def cmd_status(args) -> int:
@@ -135,6 +184,23 @@ def cmd_version(args) -> int:
 
 def _now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ")
+
+
+def _append_log(cfg: Config, line: str) -> None:
+    """Append a timestamped line to the activity log the setup UI reads.
+
+    The systemd journal isn't readable by the unprivileged service user, so the
+    log lives in the state dir. Trimmed when it grows past ~1 MB.
+    """
+    try:
+        path = cfg.state_dir / "calsync.log"
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write(f"[{_now()}] {line}\n")
+        if path.stat().st_size > 1_000_000:
+            kept = path.read_text("utf-8", "replace").splitlines()[-500:]
+            path.write_text("\n".join(kept) + "\n", encoding="utf-8")
+    except OSError:
+        pass
 
 
 def _write_last_run(cfg: Config, result) -> None:

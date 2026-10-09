@@ -39,6 +39,37 @@ class SetupState:
         self.device: msgraph.DeviceCode | None = None
         self.oauth_state: str | None = None
         self.last_error: str | None = None
+        self.syncing = False
+
+    def start_sync(self) -> bool:
+        """Run one sync in the background. Returns False if one is already
+        running. Uses the same file lock as the loop, so the two never overlap."""
+        with self.lock:
+            if self.syncing:
+                return False
+            self.syncing = True
+        threading.Thread(target=self._do_sync, daemon=True).start()
+        return True
+
+    def _do_sync(self) -> None:
+        try:
+            from .__main__ import _run_once
+
+            cfg = Config.load(self.cfg.state_dir)
+            tokens = TokenStore.load(cfg.token_path)
+            _run_once(cfg, tokens)
+            self.last_error = None
+        except Exception as exc:  # noqa: BLE001
+            self.last_error = f"sync: {exc}"
+        finally:
+            self.syncing = False
+
+
+def _read_json(path: Path):
+    try:
+        return json.loads(path.read_text("utf-8"))
+    except (OSError, ValueError):
+        return None
 
 
 def make_handler(state: SetupState):
@@ -80,6 +111,10 @@ def make_handler(state: SetupState):
                 self._page()
             elif path == "/status":
                 self._status()
+            elif path == "/logs":
+                self._logs()
+            elif path == "/settings":
+                self._settings_get()
             elif path == "/ms/poll":
                 self._ms_poll()
             elif path == "/google/start":
@@ -97,6 +132,14 @@ def make_handler(state: SetupState):
                 self._ms_start()
             elif parsed.path == "/google/save":
                 self._google_save()
+            elif parsed.path == "/settings":
+                self._settings_save()
+            elif parsed.path == "/sync":
+                self._sync_now()
+            elif parsed.path == "/ms/disconnect":
+                self._ms_disconnect()
+            elif parsed.path == "/google/signout":
+                self._google_signout()
             else:
                 self._send(404, b"not found", "text/plain")
 
@@ -127,8 +170,92 @@ def make_handler(state: SetupState):
                     "microsoft": t.microsoft_connected,
                     "google": t.google_connected,
                     "google_configured": bool(t.google_client_id and t.google_client_secret),
+                    "google_calendar_id": t.google_calendar_id,
                     "redirect_uri": self._redirect_uri(),
+                    "syncing": state.syncing,
+                    "last_run": _read_json(state.cfg.state_dir / "last-run.json"),
                     "error": state.last_error,
+                },
+            )
+
+        # -- settings ----------------------------------------------------
+        def _settings_get(self):
+            c = state.cfg
+            self._json(
+                200,
+                {
+                    "window_past_days": c.window_past_days,
+                    "window_future_days": c.window_future_days,
+                    "poll_interval_minutes": c.poll_interval_minutes,
+                    "google_calendar_name": c.google_calendar_name,
+                    "detail": c.detail,
+                    "skip_declined": c.skip_declined,
+                    "auto_sync": c.auto_sync,
+                    "title_prefix": c.title_prefix,
+                },
+            )
+
+        def _settings_save(self):
+            form = self._body_form()
+            c = state.cfg
+
+            def as_int(key, lo, hi, default):
+                try:
+                    return max(lo, min(hi, int(form[key])))
+                except (KeyError, ValueError):
+                    return default
+
+            c.window_past_days = as_int("window_past_days", 0, 365, c.window_past_days)
+            c.window_future_days = as_int("window_future_days", 1, 730, c.window_future_days)
+            c.poll_interval_minutes = as_int("poll_interval_minutes", 1, 1440, c.poll_interval_minutes)
+            if form.get("google_calendar_name"):
+                c.google_calendar_name = form["google_calendar_name"].strip()
+            if form.get("detail") in ("full", "title", "busy"):
+                c.detail = form["detail"]
+            c.skip_declined = form.get("skip_declined") in ("1", "true", "on", "yes")
+            c.auto_sync = form.get("auto_sync") in ("1", "true", "on", "yes")
+            c.title_prefix = form.get("title_prefix", c.title_prefix)
+            try:
+                c.save()
+            except OSError as exc:
+                self._json(500, {"error": str(exc)})
+                return
+            self._json(200, {"ok": True})
+
+        # -- sync now ----------------------------------------------------
+        def _sync_now(self):
+            if not (state.tokens.microsoft_connected and state.tokens.google_connected):
+                self._json(400, {"error": "Connect both accounts first."})
+                return
+            started = state.start_sync()
+            self._json(200, {"started": started, "syncing": state.syncing})
+
+        # -- disconnect --------------------------------------------------
+        def _ms_disconnect(self):
+            state.tokens.ms_refresh_token = None
+            state.tokens.save()
+            self._json(200, {"ok": True})
+
+        def _google_signout(self):
+            # Keep the embedded client; only drop the user's grant.
+            state.tokens.google_refresh_token = None
+            state.tokens.save()
+            self._json(200, {"ok": True})
+
+        # -- logs --------------------------------------------------------
+        def _logs(self):
+            lines: list[str] = []
+            path = state.cfg.state_dir / "calsync.log"
+            if path.exists():
+                try:
+                    lines = path.read_text("utf-8", "replace").splitlines()[-200:]
+                except OSError:
+                    lines = []
+            self._json(
+                200,
+                {
+                    "lines": lines,
+                    "last_run": _read_json(state.cfg.state_dir / "last-run.json"),
                 },
             )
 

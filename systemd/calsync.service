@@ -1,15 +1,20 @@
 [Unit]
-Description=CalSync — one sync pass (Outlook/M365 -> Google)
+Description=CalSync — background sync loop (Outlook/M365 -> Google)
 After=network-online.target
 Wants=network-online.target
 
 [Service]
-Type=oneshot
+# Long-running loop: it re-reads config each tick, so interval / auto-sync /
+# window / detail changes made in the setup UI take effect without a restart,
+# and it runs immediately when the UI requests a sync.
+Type=simple
 User=calsync
 Group=calsync
 Environment=CALSYNC_STATE_DIR=/var/lib/calsync
-ExecStart=/usr/bin/python3 -m calsync sync
+ExecStart=/usr/bin/python3 -m calsync sync --loop
 WorkingDirectory=/opt/calsync
+Restart=always
+RestartSec=10
 # Hardening: the service only needs its own state dir and outbound network.
 NoNewPrivileges=yes
 PrivateTmp=yes

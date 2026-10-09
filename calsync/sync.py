@@ -58,6 +58,8 @@ def run_sync(
     past_days: int,
     future_days: int,
     title_prefix: str = "",
+    detail: str = "full",
+    skip_declined: bool = False,
     now: datetime | None = None,
 ) -> SyncResult:
     result = SyncResult()
@@ -66,7 +68,7 @@ def run_sync(
     # 1. Source events, keyed by stable source id.
     source: dict[str, dict[str, Any]] = {}
     for ev in graph.iter_calendar_view(start, end):
-        if not transform.is_syncable(ev):
+        if not transform.is_syncable(ev, skip_declined=skip_declined):
             continue
         source[transform.source_id(ev)] = ev
 
@@ -88,7 +90,7 @@ def run_sync(
 
     # 3a. Insert / update.
     for sid, ev in source.items():
-        body = transform.to_google_event(ev, title_prefix=title_prefix)
+        body = transform.to_google_event(ev, title_prefix=title_prefix, detail=detail)
         current = existing.get(sid)
         if current is None:
             if _safe(result, lambda: google.insert_event(calendar_id, body), f"insert {sid}"):

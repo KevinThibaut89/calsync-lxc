@@ -63,6 +63,28 @@ class Config:
     ms_scopes: str = GRAPH_SCOPES
     # Prefix on copied event titles (empty string disables).
     title_prefix: str = ""
+    # How much of each event to copy: "full" (title, location, notes),
+    # "title" (title + location), or "busy" (just a "Busy" block).
+    detail: str = "full"
+    # Skip meetings the user declined.
+    skip_declined: bool = True
+    # Whether the background loop syncs on its own.
+    auto_sync: bool = True
+
+    # Which plain scalars go into config.toml (secrets stay in tokens.json).
+    _PERSIST = (
+        "window_past_days",
+        "window_future_days",
+        "poll_interval_minutes",
+        "google_calendar_name",
+        "title_prefix",
+        "detail",
+        "skip_declined",
+        "auto_sync",
+        "ms_tenant",
+        "ms_client_id",
+        "ms_scopes",
+    )
 
     @property
     def config_path(self) -> Path:
@@ -84,6 +106,44 @@ class Config:
                     setattr(cfg, key, value)
         cfg.state_dir = sd
         return cfg
+
+    def save(self) -> None:
+        """Write the non-secret settings to config.toml, grouped into sections."""
+        self.state_dir.mkdir(parents=True, exist_ok=True)
+        sections = {
+            "sync": {
+                "past_days": self.window_past_days,
+                "future_days": self.window_future_days,
+                "interval_minutes": self.poll_interval_minutes,
+                "auto_sync": self.auto_sync,
+                "detail": self.detail,
+                "skip_declined": self.skip_declined,
+                "title_prefix": self.title_prefix,
+            },
+            "google": {"calendar_name": self.google_calendar_name},
+            "microsoft": {
+                "tenant": self.ms_tenant,
+                "client_id": self.ms_client_id,
+                "scopes": self.ms_scopes,
+            },
+        }
+        lines = ["# CalSync configuration (non-secret). Managed by the setup UI.", ""]
+        for name, kv in sections.items():
+            lines.append(f"[{name}]")
+            for key, value in kv.items():
+                lines.append(f"{key} = {_toml_dump(value)}")
+            lines.append("")
+        tmp = self.config_path.with_suffix(".tmp")
+        tmp.write_text("\n".join(lines), "utf-8")
+        tmp.replace(self.config_path)
+
+
+def _toml_dump(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    return '"' + str(value).replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
 def _flatten(data: dict[str, Any]) -> dict[str, Any]:

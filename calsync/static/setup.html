@@ -3,54 +3,124 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CalSync setup</title>
+<title>CalSync</title>
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 <main>
-  <h1>CalSync setup</h1>
-  <p class="sub">Connect both calendars once. After that the container syncs on its own.</p>
+  <h1>CalSync</h1>
+  <p class="sub">Outlook / Microsoft 365 → Google, synced from this container.</p>
 
-  <section class="card" id="ms-card">
+  <!-- Status + Sync now -->
+  <section class="card">
     <div class="row">
-      <h2>1 · Microsoft 365 (source)</h2>
-      <span class="badge" id="ms-badge">…</span>
+      <div>
+        <h2>Status</h2>
+        <p class="muted" id="last-run">No sync yet.</p>
+      </div>
+      <div class="actions">
+        <span class="spinner hidden" id="sync-spin"></span>
+        <button id="sync-now">Sync now</button>
+      </div>
     </div>
-    <p>Sign in to the work account CalSync reads from. It connects as a calendar
-       client — no app registration needed.</p>
-    <button id="ms-connect">Connect Microsoft</button>
+    <p class="err hidden" id="sync-error"></p>
+  </section>
+
+  <!-- Accounts -->
+  <section class="card">
+    <h2>Accounts</h2>
+
+    <div class="acct">
+      <div class="acct-main">
+        <div class="acct-name">Microsoft 365 <span class="muted">· source</span></div>
+        <div class="muted" id="ms-sub">Not connected</div>
+      </div>
+      <div class="acct-actions">
+        <span class="badge" id="ms-badge">…</span>
+        <button class="ghost" id="ms-connect">Connect</button>
+        <button class="ghost hidden" id="ms-disconnect">Disconnect</button>
+      </div>
+    </div>
     <div id="ms-flow" class="flow hidden">
-      <p>Open <a id="ms-link" target="_blank" rel="noopener">this Microsoft page</a>
-         and enter the code:</p>
+      <p>Open <a id="ms-link" target="_blank" rel="noopener">this Microsoft page</a> and enter:</p>
       <p class="code" id="ms-code"></p>
       <p class="muted" id="ms-wait">Waiting for you to finish signing in…</p>
     </div>
-  </section>
 
-  <section class="card" id="google-card">
-    <div class="row">
-      <h2>2 · Google (destination)</h2>
-      <span class="badge" id="google-badge">…</span>
+    <div class="acct">
+      <div class="acct-main">
+        <div class="acct-name">Google <span class="muted">· destination</span></div>
+        <div class="muted" id="google-sub">Not connected</div>
+      </div>
+      <div class="acct-actions">
+        <span class="badge" id="google-badge">…</span>
+        <button class="ghost" id="google-connect">Connect</button>
+        <button class="ghost hidden" id="google-signout">Sign out</button>
+      </div>
     </div>
-    <p>CalSync writes into a dedicated calendar on your Google account, using an
-       OAuth client (type <b>Web application</b>) from a free Google Cloud project.</p>
-    <p class="muted">That client must have this exact redirect URI:</p>
-    <p class="code small">{{REDIRECT_URI}}</p>
-    <button id="google-connect">Connect Google</button>
     <input id="google-file" type="file" accept=".json,application/json" hidden>
-    <p class="muted" id="google-hint">Pick the client JSON you downloaded from Google
-       (Credentials → your Web client → Download). It's read in your browser and sent
-       only to this container.</p>
-    <!-- JS fills and submits this to the existing endpoint so the browser follows
-         the redirect to Google. -->
+    <p class="muted hidden" id="google-hint">Pick the Web-application client JSON you downloaded
+       from Google. It's read in your browser and sent only to this container. Required redirect URI:
+       <span class="code small">{{REDIRECT_URI}}</span></p>
     <form id="google-form" method="post" action="/google/save" hidden>
-      <input name="client_id" id="gf-id">
-      <input name="client_secret" id="gf-secret">
+      <input name="client_id" id="gf-id"><input name="client_secret" id="gf-secret">
     </form>
   </section>
 
-  <p class="done hidden" id="done">✓ Both calendars connected. You can close this page —
-     the first sync runs within a few minutes.</p>
+  <!-- Settings -->
+  <form id="settings-form">
+  <section class="card">
+    <h2>Google Calendar</h2>
+    <label class="field">Calendar name
+      <input name="google_calendar_name" id="s-calname" autocomplete="off">
+    </label>
+    <label class="field">Event details
+      <select name="detail" id="s-detail">
+        <option value="busy">Busy only</option>
+        <option value="title">Title &amp; location</option>
+        <option value="full">Title, location &amp; notes</option>
+      </select>
+    </label>
+    <label class="check"><input type="checkbox" name="skip_declined" id="s-skip" value="1">
+      Skip meetings I declined</label>
+    <div class="two">
+      <label class="field">Days in the past
+        <input type="number" name="window_past_days" id="s-past" min="0" max="365">
+      </label>
+      <label class="field">Days ahead
+        <input type="number" name="window_future_days" id="s-future" min="1" max="730">
+      </label>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Schedule</h2>
+    <label class="check"><input type="checkbox" name="auto_sync" id="s-auto" value="1">
+      Sync automatically</label>
+    <label class="field">Every
+      <select name="poll_interval_minutes" id="s-interval">
+        <option value="5">5 minutes</option>
+        <option value="10">10 minutes</option>
+        <option value="15">15 minutes</option>
+        <option value="30">30 minutes</option>
+        <option value="60">60 minutes</option>
+      </select>
+    </label>
+    <div class="row">
+      <button type="submit" id="save-settings">Save settings</button>
+      <span class="muted" id="saved-note"></span>
+    </div>
+  </section>
+  </form>
+
+  <!-- Activity -->
+  <section class="card">
+    <div class="row">
+      <h2>Activity</h2>
+      <button type="button" class="ghost" id="logs-refresh">Refresh</button>
+    </div>
+    <pre class="logs" id="logs">—</pre>
+  </section>
 </main>
 <script src="/static/app.js"></script>
 </body>

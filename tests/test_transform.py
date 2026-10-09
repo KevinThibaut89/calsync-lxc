@@ -63,6 +63,32 @@ class TransformTests(unittest.TestCase):
         ev = graph_event("8", "Gone", "2026-01-02T12:00:00", "2026-01-02T13:00:00", cancelled=True)
         self.assertFalse(transform.is_syncable(ev))
 
+    def test_detail_busy_hides_everything(self):
+        ev = graph_event(
+            "9", "Secret 1:1", "2026-01-02T12:00:00", "2026-01-02T13:00:00",
+            location="Room", body="notes", body_type="text",
+        )
+        g = transform.to_google_event(ev, detail="busy")
+        self.assertEqual(g["summary"], "Busy")
+        self.assertNotIn("location", g)
+        self.assertNotIn("description", g)
+
+    def test_detail_title_keeps_location_not_notes(self):
+        ev = graph_event(
+            "10", "Review", "2026-01-02T12:00:00", "2026-01-02T13:00:00",
+            location="Room", body="secret notes", body_type="text",
+        )
+        g = transform.to_google_event(ev, detail="title")
+        self.assertEqual(g["summary"], "Review")
+        self.assertEqual(g["location"], "Room")
+        self.assertNotIn("description", g)
+
+    def test_declined_skipped_only_when_requested(self):
+        ev = graph_event("11", "Nope", "2026-01-02T12:00:00", "2026-01-02T13:00:00")
+        ev["responseStatus"] = {"response": "declined"}
+        self.assertTrue(transform.is_syncable(ev))
+        self.assertFalse(transform.is_syncable(ev, skip_declined=True))
+
 
 if __name__ == "__main__":
     unittest.main()

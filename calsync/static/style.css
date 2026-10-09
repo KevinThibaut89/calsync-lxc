@@ -62,3 +62,47 @@ input {
   border-radius: 10px; font-weight: 600;
 }
 a { color: var(--accent); }
+
+/* --- settings / accounts / logs UI --- */
+.actions { display: flex; align-items: center; gap: 10px; }
+.acct {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 0; border-top: 1px solid var(--line);
+}
+.acct:first-of-type { border-top: 0; }
+.acct-name { font-weight: 600; }
+.acct-name .muted { font-weight: 400; }
+.acct-actions { display: flex; align-items: center; gap: 8px; }
+button.ghost {
+  background: transparent; color: var(--accent);
+  border: 1px solid var(--line); padding: 6px 12px; font-size: 13px; font-weight: 600;
+}
+button.ghost:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+button:disabled { opacity: .5; cursor: default; }
+.field { display: block; margin: 12px 0; font-size: 13px; color: var(--muted); }
+.field input, .field select {
+  display: block; width: 100%; margin-top: 5px; padding: 9px 10px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--bg);
+  color: var(--ink); font-size: 14px;
+}
+.check { display: flex; align-items: center; gap: 8px; margin: 12px 0; font-size: 14px; }
+.check input { width: 16px; height: 16px; }
+.two { display: flex; gap: 12px; }
+.two .field { flex: 1; }
+.err { color: #b91c1c; font-size: 13px; margin: 10px 0 0; }
+@media (prefers-color-scheme: dark) { .err { color: #f87171; } }
+.logs {
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+  padding: 10px 12px; margin: 10px 0 0;
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  max-height: 260px; overflow: auto; white-space: pre-wrap; word-break: break-word;
+}
+.spinner {
+  width: 16px; height: 16px; border: 2px solid var(--line);
+  border-top-color: var(--accent); border-radius: 50%;
+  display: inline-block; animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* The `hidden` attribute must win over the generic input/display rules. */
+[hidden] { display: none !important; }
