@@ -32,14 +32,20 @@
       <h2>2 · Google (destination)</h2>
       <span class="badge" id="google-badge">…</span>
     </div>
-    <p>CalSync writes into a dedicated calendar on your Google account. You need
-       an OAuth client from a free Google Cloud project (type <b>Web application</b>).</p>
-    <p class="muted">Add this exact redirect URI to that OAuth client first:</p>
+    <p>CalSync writes into a dedicated calendar on your Google account, using an
+       OAuth client (type <b>Web application</b>) from a free Google Cloud project.</p>
+    <p class="muted">That client must have this exact redirect URI:</p>
     <p class="code small">{{REDIRECT_URI}}</p>
-    <form method="post" action="/google/save">
-      <label>Client ID<input name="client_id" autocomplete="off" required></label>
-      <label>Client secret<input name="client_secret" type="password" autocomplete="off" required></label>
-      <button type="submit">Connect Google</button>
+    <button id="google-connect">Connect Google</button>
+    <input id="google-file" type="file" accept=".json,application/json" hidden>
+    <p class="muted" id="google-hint">Pick the client JSON you downloaded from Google
+       (Credentials → your Web client → Download). It's read in your browser and sent
+       only to this container.</p>
+    <!-- JS fills and submits this to the existing endpoint so the browser follows
+         the redirect to Google. -->
+    <form id="google-form" method="post" action="/google/save" hidden>
+      <input name="client_id" id="gf-id">
+      <input name="client_secret" id="gf-secret">
     </form>
   </section>
 

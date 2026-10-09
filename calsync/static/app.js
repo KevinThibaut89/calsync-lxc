@@ -60,11 +60,45 @@ async function pollMs() {
   }
 }
 
+// Google: a single button that reads the downloaded client JSON and submits it,
+// so there's nothing to type. The browser parses the file and POSTs the two
+// fields to /google/save, which 302-redirects on to Google's consent screen.
+$("google-connect").addEventListener("click", () => $("google-file").click());
+
+$("google-file").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  let data;
+  try {
+    data = JSON.parse(await file.text());
+  } catch (err) {
+    alert("That doesn't look like a Google client JSON file.");
+    return;
+  }
+  if (data.installed) {
+    alert(
+      "This is a 'Desktop app' client (localhost redirect only), which can't be " +
+      "used from the container. In Google Cloud create an OAuth client of type " +
+      "'Web application', add the redirect URI shown above, download its JSON, " +
+      "and use that file."
+    );
+    return;
+  }
+  const c = data.web;
+  if (!c || !c.client_id || !c.client_secret) {
+    alert("Couldn't find a Web-application client id and secret in that file.");
+    return;
+  }
+  $("gf-id").value = c.client_id;
+  $("gf-secret").value = c.client_secret;
+  $("google-form").submit();
+});
+
 // Reflect ?ok / ?e query flags into a quick message, then clean the URL.
 const params = new URLSearchParams(location.search);
 if (params.has("e")) {
   const msg = {
-    google_missing: "Enter both the client ID and secret.",
+    google_missing: "Upload your Web-application client JSON to connect Google.",
     google_denied: "Google sign-in was declined.",
     google_state: "Google sign-in expired — try again.",
     google_exchange: "Could not complete Google sign-in. Check the client and redirect URI.",

@@ -36,6 +36,10 @@ except ModuleNotFoundError:  # 3.9 / 3.10 fallback: a minimal subset reader.
 DEFAULT_MS_CLIENT_ID = "d3590ed6-52b3-4102-aeff-aad2292ab01c"
 DEFAULT_MS_TENANT = "organizations"
 GRAPH_SCOPES = "offline_access https://graph.microsoft.com/Calendars.Read"
+# Exchange Web Services resource. In tenants that block delegated Graph for
+# unmanaged apps (admin-consent required), the Office client is often still
+# preauthorized for Exchange — the same path desktop mail clients use.
+EWS_SCOPES = "offline_access https://outlook.office365.com/EWS.AccessAsUser.All"
 GOOGLE_SCOPES = "https://www.googleapis.com/auth/calendar"
 
 DEFAULT_STATE_DIR = Path(os.environ.get("CALSYNC_STATE_DIR", "/var/lib/calsync"))
@@ -53,6 +57,10 @@ class Config:
     # Microsoft identity.
     ms_tenant: str = DEFAULT_MS_TENANT
     ms_client_id: str = DEFAULT_MS_CLIENT_ID
+    # OAuth scopes requested from Microsoft. Default reads the calendar over
+    # Graph; set to EWS_SCOPES (config: scopes = "...EWS.AccessAsUser.All") in
+    # tenants where Graph needs admin consent but Exchange does not.
+    ms_scopes: str = GRAPH_SCOPES
     # Prefix on copied event titles (empty string disables).
     title_prefix: str = ""
 
@@ -88,6 +96,7 @@ def _flatten(data: dict[str, Any]) -> dict[str, Any]:
         "calendar_name": "google_calendar_name",
         "tenant": "ms_tenant",
         "client_id": "ms_client_id",
+        "scopes": "ms_scopes",
     }
     for key, value in data.items():
         if isinstance(value, dict):

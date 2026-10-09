@@ -31,7 +31,7 @@ def _load(args) -> tuple[Config, TokenStore]:
 
 def cmd_connect_microsoft(args) -> int:
     cfg, tokens = _load(args)
-    dc = msgraph.begin_device_code(cfg.ms_client_id, cfg.ms_tenant, cfgmod.GRAPH_SCOPES)
+    dc = msgraph.begin_device_code(cfg.ms_client_id, cfg.ms_tenant, cfg.ms_scopes)
     print()
     print("  Sign in to Microsoft 365:")
     print(f"    1. Open  {dc.verification_uri}")

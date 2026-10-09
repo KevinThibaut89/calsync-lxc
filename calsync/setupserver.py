@@ -136,7 +136,7 @@ def make_handler(state: SetupState):
         def _ms_start(self):
             try:
                 dc = msgraph.begin_device_code(
-                    state.cfg.ms_client_id, state.cfg.ms_tenant, cfgmod.GRAPH_SCOPES
+                    state.cfg.ms_client_id, state.cfg.ms_tenant, state.cfg.ms_scopes
                 )
             except Exception as exc:  # noqa: BLE001
                 self._json(500, {"error": str(exc)})
